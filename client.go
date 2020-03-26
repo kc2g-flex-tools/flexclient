@@ -173,7 +173,9 @@ func (f *FlexClient) runUDP() {
 		}
 	}
 out:
-	return
+	if f.vitaPackets != nil {
+		close(f.vitaPackets)
+	}
 }
 
 func (f *FlexClient) parseUDP(pkt []byte) {
