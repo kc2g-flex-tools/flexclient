@@ -157,7 +157,7 @@ func (f *FlexClient) runUDP() {
 	for {
 		n, err := f.udpConn.Read(pkt[:])
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "udp: %#v\n", err)
+			fmt.Fprintf(os.Stderr, "udp: %s\n", err.Error())
 			switch e := err.(type) {
 			case net.Error:
 				if e.Temporary() {
