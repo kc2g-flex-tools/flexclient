@@ -138,7 +138,9 @@ func (f *FlexClient) Run() {
 		for _, c := range f.cmdResults {
 			close(c)
 		}
-		f.udpConn.Close()
+		if f.udpConn != nil {
+			f.udpConn.Close()
+		}
 	}()
 
 	f.runTCP()
