@@ -281,11 +281,14 @@ func (f *FlexClient) parseState(line string) {
 
 	for _, sub := range f.subscriptions {
 		if strings.HasPrefix(object, sub.Prefix) {
-			sub.Updates <- StateUpdate{
+			select {
+			case sub.Updates <- StateUpdate{
 				SenderHandle: handle,
 				Object:       object,
 				Updated:      set,
 				CurrentState: f.state[object],
+			}:
+			default:
 			}
 		}
 	}

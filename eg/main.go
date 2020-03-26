@@ -25,7 +25,7 @@ func main() {
 	}()
 
 	go func() {
-		updates := make(chan flexclient.StateUpdate)
+		updates := make(chan flexclient.StateUpdate, 10)
 		sub := fc.Subscribe(flexclient.Subscription{"", updates})
 		for upd := range updates {
 			fmt.Printf("S[%s]%s: %v -> %v\n", upd.SenderHandle, upd.Object, upd.Updated, upd.CurrentState)
