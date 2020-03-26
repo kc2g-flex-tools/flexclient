@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/signal"
@@ -42,13 +43,22 @@ func main() {
 
 	time.Sleep(1 * time.Second)
 	res := cli.SendAndWait("sub slice all")
-	fmt.Printf("%+v\n", res)
+	fmt.Println(res)
 
 	go func() {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt)
 		_ = <-c
 		fmt.Println("Exit on SIGINT")
+		cli.Close()
+	}()
+
+	go func() {
+		lines := bufio.NewScanner(os.Stdin)
+		for lines.Scan() {
+			res := cli.SendAndWait(lines.Text())
+			fmt.Println(res)
+		}
 		cli.Close()
 	}()
 

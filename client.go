@@ -33,6 +33,10 @@ type CmdResult struct {
 	Message string
 }
 
+func (c CmdResult) String() string {
+	return fmt.Sprintf("[%d]%08x %s", c.Serial, c.Error, c.Message)
+}
+
 type StateUpdate struct {
 	SenderHandle string
 	Object       string
@@ -64,11 +68,9 @@ func (f *FlexClient) SendCmd(cmd string) uint32 {
 
 func (f *FlexClient) SendAndWait(cmd string) CmdResult {
 	idx := f.SendCmd(cmd)
-	fmt.Println("Sent", idx)
 	f.Lock()
 	f.cmdResults[idx] = make(chan CmdResult)
 	f.Unlock()
-	fmt.Printf("Wait queue: %+v\n", f.cmdResults)
 
 	result := <-f.cmdResults[idx]
 	return result
@@ -89,6 +91,10 @@ func (f *FlexClient) Run() {
 }
 
 func (f *FlexClient) ParseLine(line string) {
+	if len(line) == 0 {
+		return
+	}
+
 	switch line[0] {
 	case 'V':
 		f.ParseVersion(line[1:])
@@ -109,14 +115,12 @@ func (f *FlexClient) ParseVersion(line string) {
 	f.Lock()
 	f.version = line
 	f.Unlock()
-	fmt.Println("Version:", f.version)
 }
 
 func (f *FlexClient) ParseHandle(line string) {
 	f.Lock()
 	f.handle = line
 	f.Unlock()
-	fmt.Println("Handle:", f.handle)
 }
 
 func (f *FlexClient) ParseMessage(line string) {
@@ -152,10 +156,14 @@ func (f *FlexClient) ParseState(line string) {
 		}
 		eqIdx := strings.IndexByte(part, '=')
 		if eqIdx == -1 {
-			if object != "" {
-				object += " "
+			if part == "removed" {
+				f.state[object] = nil
+			} else {
+				if object != "" {
+					object += " "
+				}
+				object += part
 			}
-			object += part
 		} else {
 			if f.state[object] == nil {
 				f.state[object] = map[string]string{}
@@ -187,8 +195,6 @@ func (f *FlexClient) ParseCmdResult(line string) {
 		Error:   uint32(err),
 		Message: parts[2],
 	}
-
-	fmt.Printf("CMD RES: %+v\n", res)
 
 	f.RLock()
 	dchan := f.cmdResults[res.Serial]
