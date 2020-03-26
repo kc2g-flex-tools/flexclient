@@ -71,7 +71,15 @@ func NewFlexClient(dst string) (*FlexClient, error) {
 func (f *FlexClient) SendCmd(cmd string) uint32 {
 	f.Lock()
 	defer f.Unlock()
-	f.cmdIndex += 1
+	for {
+		f.cmdIndex += 1
+		// On the off chance that we've wrapped around and the four-billion-previous
+		// command is still outstanding, increment until we find a free slot.
+		_, found := f.cmdResults[f.cmdIndex]
+		if !found {
+			break
+		}
+	}
 	fmt.Fprintf(f.tcpConn, "C%d|%s\n", f.cmdIndex, cmd)
 	return f.cmdIndex
 }
@@ -83,6 +91,10 @@ func (f *FlexClient) SendAndWait(cmd string) CmdResult {
 	f.Unlock()
 
 	result := <-f.cmdResults[idx]
+
+	f.Lock()
+	delete(f.cmdResults, idx)
+	f.Unlock()
 	return result
 }
 
