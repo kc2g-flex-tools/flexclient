@@ -122,6 +122,8 @@ func (f *FlexClient) StartUDP() error {
 	if res.Error != 0 {
 		return fmt.Errorf("%08x setting client udpport (%s)", res.Error, res.Message)
 	}
+
+	go f.runUDP()
 	return nil
 }
 
@@ -137,7 +139,6 @@ func (f *FlexClient) Run() {
 		f.udpConn.Close()
 	}()
 
-	go f.runUDP()
 	f.runTCP()
 }
 
