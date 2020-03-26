@@ -184,7 +184,10 @@ func (f *FlexClient) parseUDP(pkt []byte) {
 
 	err, preamble, payload := vita.ParseVitaPreamble(pkt)
 	if err == nil {
-		dchan <- VitaPacket{preamble, payload}
+		select {
+		case dchan <- VitaPacket{preamble, payload}:
+		default:
+		}
 	} else {
 		fmt.Fprintf(os.Stderr, "vita parse err %s\n", err.Error())
 	}
