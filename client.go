@@ -17,7 +17,7 @@ type FlexClient struct {
 	tcpConn      net.Conn
 	udpConn      *net.UDPConn
 	lines        *bufio.Scanner
-	state        map[string]map[string]string
+	state        State
 	version      string
 	handle       string
 	cmdIndex     uint32
@@ -45,14 +45,17 @@ func (c CmdResult) String() string {
 type StateUpdate struct {
 	SenderHandle string
 	Object       string
-	Updated      map[string]string
-	CurrentState map[string]string
+	Updated      Object
+	CurrentState Object
 }
 
 type VitaPacket struct {
 	Preamble *vita.VitaPacketPreamble
 	Payload  []byte
 }
+
+type Object map[string]string
+type State map[string]Object
 
 func NewFlexClient(dst string) (*FlexClient, error) {
 	tcpConn, err := net.Dial("tcp", dst)
@@ -63,7 +66,7 @@ func NewFlexClient(dst string) (*FlexClient, error) {
 	return &FlexClient{
 		tcpConn:    tcpConn,
 		lines:      bufio.NewScanner(tcpConn),
-		state:      map[string]map[string]string{},
+		state:      State{},
 		cmdResults: map[uint32]chan CmdResult{},
 	}, nil
 }
@@ -231,7 +234,7 @@ func (f *FlexClient) parseState(line string) {
 	status := line[pipeIdx+1:]
 
 	object := ""
-	set := map[string]string{}
+	set := Object{}
 
 	parts := strings.Split(status, " ")
 	for i, part := range parts {
@@ -315,20 +318,35 @@ func (f *FlexClient) SetVitaChan(ch chan VitaPacket) {
 	f.vitaPackets = ch
 }
 
-func (f *FlexClient) GetObject(key string) (map[string]string, bool) {
-	f.RLock()
-	defer f.RUnlock()
+func (f *FlexClient) getObject(key string) (Object, bool) {
 	val, ok := f.state[key]
-	return val, ok
+	if !ok {
+		return nil, false
+	}
+	cpy := map[string]string{}
+	for k, v := range val {
+		cpy[k] = v
+	}
+	return cpy, true
 }
 
-func (f *FlexClient) FindObjects(pfx string) []string {
+func (f *FlexClient) GetObject(key string) (Object, bool) {
 	f.RLock()
 	defer f.RUnlock()
-	ret := []string{}
+	return f.getObject(key)
+}
+
+func (f *FlexClient) FindObjects(pfx string) State {
+	f.RLock()
+	defer f.RUnlock()
+	ret := State{}
+
 	for key, _ := range f.state {
 		if strings.HasPrefix(key, pfx) {
-			ret = append(ret, key)
+			obj, ok := f.getObject(key)
+			if ok {
+				ret[key] = obj
+			}
 		}
 	}
 	return ret

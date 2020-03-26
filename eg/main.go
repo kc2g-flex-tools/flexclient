@@ -58,6 +58,9 @@ func main() {
 	fc.StartUDP()
 	fc.SendAndWait("sub slice all")
 
+	slices := fc.FindObjects("slice ")
+	fmt.Printf("%#v\n", slices)
+
 	go func() {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt)
