@@ -163,15 +163,17 @@ func (f *FlexClient) runUDP() {
 				if e.Temporary() {
 					continue
 				} else {
-					break
+					goto out
 				}
 			default:
-				break
+				goto out
 			}
+		} else {
+			f.parseUDP(pkt[:n])
 		}
-
-		f.parseUDP(pkt[:n])
 	}
+out:
+	return
 }
 
 func (f *FlexClient) parseUDP(pkt []byte) {
