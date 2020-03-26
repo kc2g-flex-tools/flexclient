@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"sync"
-	"time"
 
 	"github.com/arodland/flexclient"
 )
@@ -33,6 +32,21 @@ func main() {
 		}
 	}()
 
+	go func() {
+		file, err := os.Create("out.raw")
+		if err != nil {
+			panic(err)
+		}
+
+		vitaPackets := make(chan flexclient.VitaPacket)
+		cli.SetVitaChan(vitaPackets)
+		for pkt := range vitaPackets {
+			if pkt.Preamble.Class_id.PacketClassCode == 0x03e3 {
+				file.Write(pkt.Payload)
+			}
+		}
+	}()
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -41,9 +55,8 @@ func main() {
 		wg.Done()
 	}()
 
-	time.Sleep(1 * time.Second)
-	res := cli.SendAndWait("sub slice all")
-	fmt.Println(res)
+	cli.SetUDP()
+	cli.SendAndWait("sub slice all")
 
 	go func() {
 		c := make(chan os.Signal, 1)

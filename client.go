@@ -7,11 +7,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/krippendorf/flexlib-go/vita"
 )
 
 type FlexClient struct {
 	sync.RWMutex
-	conn         net.Conn
+	tcpConn      net.Conn
+	udpConn      *net.UDPConn
 	lines        *bufio.Scanner
 	state        map[string]map[string]string
 	version      string
@@ -20,6 +23,7 @@ type FlexClient struct {
 	messages     chan Message
 	stateUpdates chan StateUpdate
 	cmdResults   map[uint32]chan CmdResult
+	vitaPackets  chan VitaPacket
 }
 
 type Message struct {
@@ -44,15 +48,26 @@ type StateUpdate struct {
 	CurrentState map[string]string
 }
 
+type VitaPacket struct {
+	Preamble *vita.VitaPacketPreamble
+	Payload  []byte
+}
+
 func NewFlexClient(dst string) (*FlexClient, error) {
-	conn, err := net.Dial("tcp", dst)
+	tcpConn, err := net.Dial("tcp", dst)
 	if err != nil {
 		return nil, fmt.Errorf("%w connecting to %s", err, dst)
 	}
 
+	udpConn, err := net.ListenUDP("udp", nil)
+	if err != nil {
+		return nil, fmt.Errorf("%w binding to UDP port", err)
+	}
+
 	return &FlexClient{
-		conn:       conn,
-		lines:      bufio.NewScanner(conn),
+		tcpConn:    tcpConn,
+		udpConn:    udpConn,
+		lines:      bufio.NewScanner(tcpConn),
 		state:      map[string]map[string]string{},
 		cmdResults: map[uint32]chan CmdResult{},
 	}, nil
@@ -62,7 +77,7 @@ func (f *FlexClient) SendCmd(cmd string) uint32 {
 	f.Lock()
 	defer f.Unlock()
 	f.cmdIndex += 1
-	fmt.Fprintf(f.conn, "C%d|%s\n", f.cmdIndex, cmd)
+	fmt.Fprintf(f.tcpConn, "C%d|%s\n", f.cmdIndex, cmd)
 	return f.cmdIndex
 }
 
@@ -76,6 +91,14 @@ func (f *FlexClient) SendAndWait(cmd string) CmdResult {
 	return result
 }
 
+func (f *FlexClient) udpPort() int {
+	return f.udpConn.LocalAddr().(*net.UDPAddr).Port
+}
+
+func (f *FlexClient) SetUDP() CmdResult {
+	return f.SendAndWait(fmt.Sprintf("client udpport %d", f.udpPort()))
+}
+
 func (f *FlexClient) Run() {
 	defer func() {
 		close(f.messages)
@@ -83,47 +106,91 @@ func (f *FlexClient) Run() {
 		for _, c := range f.cmdResults {
 			close(c)
 		}
+		f.udpConn.Close()
 	}()
 
+	go f.runUDP()
+	f.runTCP()
+}
+
+func (f *FlexClient) runTCP() {
 	for f.lines.Scan() {
-		f.ParseLine(f.lines.Text())
+		f.parseLine(f.lines.Text())
 	}
 }
 
-func (f *FlexClient) ParseLine(line string) {
+func (f *FlexClient) runUDP() {
+	var pkt [64000]byte
+	for {
+		n, err := f.udpConn.Read(pkt[:])
+		if err != nil {
+			fmt.Printf("%#v\n", err)
+			switch e := err.(type) {
+			case net.Error:
+				if e.Temporary() {
+					continue
+				} else {
+					break
+				}
+			default:
+				break
+			}
+		}
+
+		f.parseUDP(pkt[:n])
+	}
+}
+
+func (f *FlexClient) parseUDP(pkt []byte) {
+	f.RLock()
+	dchan := f.vitaPackets
+	f.RUnlock()
+	if dchan == nil {
+		return
+	}
+
+	err, preamble, payload := vita.ParseVitaPreamble(pkt)
+	if err == nil {
+		dchan <- VitaPacket{preamble, payload}
+	} else {
+		fmt.Printf("vita parse err %s\n", err.Error())
+	}
+}
+
+func (f *FlexClient) parseLine(line string) {
 	if len(line) == 0 {
 		return
 	}
 
 	switch line[0] {
 	case 'V':
-		f.ParseVersion(line[1:])
+		f.parseVersion(line[1:])
 	case 'H':
-		f.ParseHandle(line[1:])
+		f.parseHandle(line[1:])
 	case 'M':
-		f.ParseMessage(line[1:])
+		f.parseMessage(line[1:])
 	case 'S':
-		f.ParseState(line[1:])
+		f.parseState(line[1:])
 	case 'R':
-		f.ParseCmdResult(line[1:])
+		f.parseCmdResult(line[1:])
 	default:
 		fmt.Println("Unknown line:", line)
 	}
 }
 
-func (f *FlexClient) ParseVersion(line string) {
+func (f *FlexClient) parseVersion(line string) {
 	f.Lock()
 	f.version = line
 	f.Unlock()
 }
 
-func (f *FlexClient) ParseHandle(line string) {
+func (f *FlexClient) parseHandle(line string) {
 	f.Lock()
 	f.handle = line
 	f.Unlock()
 }
 
-func (f *FlexClient) ParseMessage(line string) {
+func (f *FlexClient) parseMessage(line string) {
 	f.RLock()
 	dchan := f.messages
 	f.RUnlock()
@@ -138,7 +205,7 @@ func (f *FlexClient) ParseMessage(line string) {
 	}
 }
 
-func (f *FlexClient) ParseState(line string) {
+func (f *FlexClient) parseState(line string) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -150,13 +217,17 @@ func (f *FlexClient) ParseState(line string) {
 	set := map[string]string{}
 
 	parts := strings.Split(status, " ")
-	for _, part := range parts {
+	for i, part := range parts {
 		if part == "" {
 			continue
 		}
 		eqIdx := strings.IndexByte(part, '=')
 		if eqIdx == -1 {
-			if part == "removed" {
+			if i == len(parts)-1 && part == "removed" {
+				f.state[object] = nil
+			} else if parts[0] == "client" && i == 2 && part == "connected" {
+				// don't include "connected" in the object name
+			} else if parts[0] == "client" && i == 2 && part == "disconnected" {
 				f.state[object] = nil
 			} else {
 				if object != "" {
@@ -185,7 +256,7 @@ func (f *FlexClient) ParseState(line string) {
 	}
 }
 
-func (f *FlexClient) ParseCmdResult(line string) {
+func (f *FlexClient) parseCmdResult(line string) {
 	parts := strings.Split(line, "|")
 	ser, _ := strconv.ParseUint(parts[0], 10, 32)
 	err, _ := strconv.ParseUint(parts[1], 16, 32)
@@ -206,7 +277,7 @@ func (f *FlexClient) ParseCmdResult(line string) {
 }
 
 func (f *FlexClient) Close() error {
-	return f.conn.Close()
+	return f.tcpConn.Close()
 }
 
 func (f *FlexClient) SetMessageChan(ch chan Message) {
@@ -219,4 +290,29 @@ func (f *FlexClient) SetStateChan(ch chan StateUpdate) {
 	f.Lock()
 	defer f.Unlock()
 	f.stateUpdates = ch
+}
+
+func (f *FlexClient) SetVitaChan(ch chan VitaPacket) {
+	f.Lock()
+	defer f.Unlock()
+	f.vitaPackets = ch
+}
+
+func (f *FlexClient) GetObject(key string) (map[string]string, bool) {
+	f.RLock()
+	defer f.RUnlock()
+	val, ok := f.state[key]
+	return val, ok
+}
+
+func (f *FlexClient) FindObjects(pfx string) []string {
+	f.RLock()
+	defer f.RUnlock()
+	ret := []string{}
+	for key, _ := range f.state {
+		if strings.HasPrefix(key, pfx) {
+			ret = append(ret, key)
+		}
+	}
+	return ret
 }
