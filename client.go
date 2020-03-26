@@ -129,7 +129,9 @@ func (f *FlexClient) StartUDP() error {
 
 func (f *FlexClient) Run() {
 	defer func() {
-		close(f.messages)
+		if f.messages != nil {
+			close(f.messages)
+		}
 		for _, s := range f.subscriptions {
 			close(s.Updates)
 		}
