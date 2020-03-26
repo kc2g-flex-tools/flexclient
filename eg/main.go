@@ -55,7 +55,7 @@ func main() {
 		wg.Done()
 	}()
 
-	cli.SetUDP()
+	cli.StartUDP()
 	cli.SendAndWait("sub slice all")
 
 	go func() {

@@ -59,14 +59,8 @@ func NewFlexClient(dst string) (*FlexClient, error) {
 		return nil, fmt.Errorf("%w connecting to %s", err, dst)
 	}
 
-	udpConn, err := net.ListenUDP("udp", nil)
-	if err != nil {
-		return nil, fmt.Errorf("%w binding to UDP port", err)
-	}
-
 	return &FlexClient{
 		tcpConn:    tcpConn,
-		udpConn:    udpConn,
 		lines:      bufio.NewScanner(tcpConn),
 		state:      map[string]map[string]string{},
 		cmdResults: map[uint32]chan CmdResult{},
@@ -95,8 +89,18 @@ func (f *FlexClient) udpPort() int {
 	return f.udpConn.LocalAddr().(*net.UDPAddr).Port
 }
 
-func (f *FlexClient) SetUDP() CmdResult {
-	return f.SendAndWait(fmt.Sprintf("client udpport %d", f.udpPort()))
+func (f *FlexClient) StartUDP() error {
+	udpConn, err := net.ListenUDP("udp", nil)
+	if err != nil {
+		return fmt.Errorf("%w binding to UDP port", err)
+	}
+	f.udpConn = udpConn
+
+	res := f.SendAndWait(fmt.Sprintf("client udpport %d", f.udpPort()))
+	if res.Error != 0 {
+		return fmt.Errorf("%08x setting client udpport (%s)", res.Error, res.Message)
+	}
+	return nil
 }
 
 func (f *FlexClient) Run() {
