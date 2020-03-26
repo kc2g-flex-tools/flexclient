@@ -14,17 +14,17 @@ import (
 
 type FlexClient struct {
 	sync.RWMutex
-	tcpConn      net.Conn
-	udpConn      *net.UDPConn
-	lines        *bufio.Scanner
-	state        State
-	version      string
-	handle       string
-	cmdIndex     uint32
-	messages     chan Message
-	stateUpdates chan StateUpdate
-	cmdResults   map[uint32]chan CmdResult
-	vitaPackets  chan VitaPacket
+	tcpConn       net.Conn
+	udpConn       *net.UDPConn
+	lines         *bufio.Scanner
+	state         State
+	version       string
+	handle        string
+	cmdIndex      uint32
+	messages      chan Message
+	subscriptions []Subscription
+	cmdResults    map[uint32]chan CmdResult
+	vitaPackets   chan VitaPacket
 }
 
 type Message struct {
@@ -49,6 +49,11 @@ type StateUpdate struct {
 	CurrentState Object
 }
 
+type Subscription struct {
+	Prefix  string
+	Updates chan StateUpdate
+}
+
 type VitaPacket struct {
 	Preamble *vita.VitaPacketPreamble
 	Payload  []byte
@@ -64,10 +69,11 @@ func NewFlexClient(dst string) (*FlexClient, error) {
 	}
 
 	return &FlexClient{
-		tcpConn:    tcpConn,
-		lines:      bufio.NewScanner(tcpConn),
-		state:      State{},
-		cmdResults: map[uint32]chan CmdResult{},
+		tcpConn:       tcpConn,
+		lines:         bufio.NewScanner(tcpConn),
+		state:         State{},
+		cmdResults:    map[uint32]chan CmdResult{},
+		subscriptions: []Subscription{},
 	}, nil
 }
 
@@ -122,7 +128,9 @@ func (f *FlexClient) StartUDP() error {
 func (f *FlexClient) Run() {
 	defer func() {
 		close(f.messages)
-		close(f.stateUpdates)
+		for _, s := range f.subscriptions {
+			close(s.Updates)
+		}
 		for _, c := range f.cmdResults {
 			close(c)
 		}
@@ -266,12 +274,14 @@ func (f *FlexClient) parseState(line string) {
 		}
 	}
 
-	if f.stateUpdates != nil {
-		f.stateUpdates <- StateUpdate{
-			SenderHandle: handle,
-			Object:       object,
-			Updated:      set,
-			CurrentState: f.state[object],
+	for _, sub := range f.subscriptions {
+		if strings.HasPrefix(object, sub.Prefix) {
+			sub.Updates <- StateUpdate{
+				SenderHandle: handle,
+				Object:       object,
+				Updated:      set,
+				CurrentState: f.state[object],
+			}
 		}
 	}
 }
@@ -306,10 +316,21 @@ func (f *FlexClient) SetMessageChan(ch chan Message) {
 	f.messages = ch
 }
 
-func (f *FlexClient) SetStateChan(ch chan StateUpdate) {
+func (f *FlexClient) Subscribe(sub Subscription) Subscription {
 	f.Lock()
 	defer f.Unlock()
-	f.stateUpdates = ch
+	f.subscriptions = append(f.subscriptions, sub)
+	return sub
+}
+
+func (f *FlexClient) Unsubscribe(sub Subscription) {
+	f.Lock()
+	defer f.Unlock()
+	for i, s := range f.subscriptions {
+		if s == sub {
+			f.subscriptions = append(f.subscriptions[:i], f.subscriptions[i+1:]...)
+		}
+	}
 }
 
 func (f *FlexClient) SetVitaChan(ch chan VitaPacket) {
