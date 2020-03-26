@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -128,7 +129,7 @@ func (f *FlexClient) runUDP() {
 	for {
 		n, err := f.udpConn.Read(pkt[:])
 		if err != nil {
-			fmt.Printf("%#v\n", err)
+			fmt.Fprintf(os.Stderr, "udp: %#v\n", err)
 			switch e := err.(type) {
 			case net.Error:
 				if e.Temporary() {
@@ -157,7 +158,7 @@ func (f *FlexClient) parseUDP(pkt []byte) {
 	if err == nil {
 		dchan <- VitaPacket{preamble, payload}
 	} else {
-		fmt.Printf("vita parse err %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "vita parse err %s\n", err.Error())
 	}
 }
 
@@ -178,7 +179,7 @@ func (f *FlexClient) parseLine(line string) {
 	case 'R':
 		f.parseCmdResult(line[1:])
 	default:
-		fmt.Println("Unknown line:", line)
+		fmt.Fprintln(os.Stderr, "Unknown line:", line)
 	}
 }
 
