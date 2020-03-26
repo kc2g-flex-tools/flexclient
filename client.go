@@ -387,3 +387,9 @@ func (f *FlexClient) FindObjects(pfx string) State {
 	}
 	return ret
 }
+
+func (f *FlexClient) ClientID() string {
+	f.RLock()
+	defer f.RUnlock()
+	return f.handle
+}
