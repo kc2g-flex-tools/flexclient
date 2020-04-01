@@ -17,6 +17,8 @@ type FlexClient struct {
 	tcpConn       net.Conn
 	udpConn       *net.UDPConn
 	lines         *bufio.Scanner
+	radioIP       string
+	udpDest       net.Addr
 	state         State
 	version       string
 	handle        string
@@ -63,12 +65,19 @@ type Object map[string]string
 type State map[string]Object
 
 func NewFlexClient(dst string) (*FlexClient, error) {
-	tcpConn, err := net.Dial("tcp", dst)
+	tcpConn, err := net.Dial("tcp", dst+":4992")
 	if err != nil {
 		return nil, fmt.Errorf("%w connecting to %s", err, dst)
 	}
 
+	udpDest, err := net.ResolveUDPAddr("udp", dst+":4991")
+	if err != nil {
+		return nil, fmt.Errorf("%w resolving UDP destination", err)
+	}
+
 	return &FlexClient{
+		radioIP:       dst,
+		udpDest:       udpDest,
 		tcpConn:       tcpConn,
 		lines:         bufio.NewScanner(tcpConn),
 		state:         State{},
@@ -195,6 +204,11 @@ func (f *FlexClient) parseUDP(pkt []byte) {
 	} else {
 		fmt.Fprintf(os.Stderr, "vita parse err %s\n", err.Error())
 	}
+}
+
+func (f *FlexClient) SendUdp(pkt []byte) error {
+	_, err := f.udpConn.WriteTo(pkt, f.udpDest)
+	return err
 }
 
 func (f *FlexClient) parseLine(line string) {
