@@ -38,6 +38,7 @@ type CmdResult struct {
 	Serial  uint32
 	Error   uint32
 	Message string
+	fc      *FlexClient
 }
 
 func (c CmdResult) String() string {
@@ -86,9 +87,8 @@ func NewFlexClient(dst string) (*FlexClient, error) {
 	}, nil
 }
 
-func (f *FlexClient) SendCmd(cmd string) uint32 {
-	f.Lock()
-	defer f.Unlock()
+// Assumes already locked
+func (f *FlexClient) sendCmd(cmd string) uint32 {
 	for {
 		f.cmdIndex += 1
 		// On the off chance that we've wrapped around and the four-billion-previous
@@ -102,18 +102,31 @@ func (f *FlexClient) SendCmd(cmd string) uint32 {
 	return f.cmdIndex
 }
 
-func (f *FlexClient) SendAndWait(cmd string) CmdResult {
-	idx := f.SendCmd(cmd)
+func (f *FlexClient) SendCmd(cmd string) uint32 {
 	f.Lock()
+	defer f.Unlock()
+	return f.sendCmd(cmd)
+}
+
+func (f *FlexClient) SendNotify(cmd string) chan CmdResult {
+	f.Lock()
+	defer f.Unlock()
+	idx := f.sendCmd(cmd)
 	f.cmdResults[idx] = make(chan CmdResult)
-	f.Unlock()
+	return f.cmdResults[idx]
+}
 
-	result := <-f.cmdResults[idx]
-
-	f.Lock()
-	delete(f.cmdResults, idx)
-	f.Unlock()
+func (f *FlexClient) SendAndWait(cmd string) CmdResult {
+	resultChan := f.SendNotify(cmd)
+	result := <-resultChan
+	result.Close()
 	return result
+}
+
+func (r *CmdResult) Close() {
+	r.fc.Lock()
+	defer r.fc.Unlock()
+	delete(r.fc.cmdResults, r.Serial)
 }
 
 func (f *FlexClient) udpPort() int {
@@ -321,6 +334,7 @@ func (f *FlexClient) parseCmdResult(line string) {
 	err, _ := strconv.ParseUint(parts[1], 16, 32)
 
 	res := CmdResult{
+		fc:      f,
 		Serial:  uint32(ser),
 		Error:   uint32(err),
 		Message: parts[2],
@@ -407,4 +421,3 @@ func (f *FlexClient) ClientID() string {
 	defer f.RUnlock()
 	return f.handle
 }
-
