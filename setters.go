@@ -37,7 +37,7 @@ func (f *FlexClient) SliceTune(sliceIdx string, freq float64) CmdResult {
 	return f.sendAndUpdateObj(
 		"slice t "+sliceIdx+" "+freqStr,
 		"slice "+sliceIdx,
-		Object(map[string]string{"RF_frequency": freqStr}),
+		Object{"RF_frequency": freqStr},
 	)
 }
 
