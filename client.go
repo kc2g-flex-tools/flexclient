@@ -66,6 +66,14 @@ type VitaPacket struct {
 type Object map[string]string
 type State map[string]Object
 
+func (o Object) Copy() Object {
+	ret := Object{}
+	for k, v := range o {
+		ret[k] = v
+	}
+	return ret
+}
+
 func NewFlexClient(dst string) (*FlexClient, error) {
 	tcpConn, err := net.Dial("tcp", dst+":4992")
 	if err != nil {
@@ -329,7 +337,7 @@ func (f *FlexClient) updateState(updatedBy string, object string, changes Object
 				SenderHandle: updatedBy,
 				Object:       object,
 				Updated:      changes,
-				CurrentState: f.state[object],
+				CurrentState: f.state[object].Copy(),
 			}
 		}
 	}
