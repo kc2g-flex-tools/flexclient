@@ -45,6 +45,14 @@ func (f *FlexClient) TransmitSet(values Object) CmdResult {
 	return f.setAndUpdateObj("transmit", "transmit", values)
 }
 
+func (f *FlexClient) TransmitTune(val string) CmdResult {
+	return f.sendAndUpdateObj(
+		"transmit tune "+val,
+		"transmit",
+		Object{"tune": val},
+	)
+}
+
 func (f *FlexClient) RadioSet(values Object) CmdResult {
 	return f.setAndUpdateObj("radio set", "radio", values)
 }
