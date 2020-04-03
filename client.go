@@ -14,6 +14,7 @@ import (
 
 type FlexClient struct {
 	sync.RWMutex
+
 	tcpConn       net.Conn
 	udpConn       *net.UDPConn
 	lines         *bufio.Scanner
@@ -303,26 +304,32 @@ func (f *FlexClient) parseState(line string) {
 				object += part
 			}
 		} else {
-			if f.state[object] == nil {
-				f.state[object] = map[string]string{}
-			}
 			key := part[0:eqIdx]
 			val := part[eqIdx+1:]
-			f.state[object][key] = val
 			set[key] = val
 		}
 	}
 
+	f.updateState(handle, object, set)
+}
+
+// Assumes locked
+func (f *FlexClient) updateState(updatedBy string, object string, changes Object) {
+	if f.state[object] == nil {
+		f.state[object] = map[string]string{}
+	}
+
+	for k, v := range changes {
+		f.state[object][k] = v
+	}
+
 	for _, sub := range f.subscriptions {
 		if strings.HasPrefix(object, sub.Prefix) {
-			select {
-			case sub.Updates <- StateUpdate{
-				SenderHandle: handle,
+			sub.Updates <- StateUpdate{
+				SenderHandle: updatedBy,
 				Object:       object,
-				Updated:      set,
+				Updated:      changes,
 				CurrentState: f.state[object],
-			}:
-			default:
 			}
 		}
 	}
