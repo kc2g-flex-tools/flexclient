@@ -7,11 +7,11 @@ func (f *FlexClient) sendAndUpdateObj(cmd, object string, changes Object) CmdRes
 	// cmdresult without any intermediate notifications being applied, then apply
 	// our changes, then unlock updateState. That way if anything the radio sends
 	// back contradicts the changes provided, the radio will win.
-	f.Lock()
-	defer f.Unlock()
 	res := f.SendAndWait(cmd)
 
 	if res.Error == 0 {
+		f.Lock()
+		defer f.Unlock()
 		f.updateState("", object, changes)
 	}
 
