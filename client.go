@@ -381,6 +381,9 @@ func (f *FlexClient) Unsubscribe(sub Subscription) {
 			f.subscriptions = append(f.subscriptions[:i], f.subscriptions[i+1:]...)
 		}
 	}
+	if sub.Updates != nil {
+		close(sub.Updates)
+	}
 }
 
 func (f *FlexClient) SetVitaChan(ch chan VitaPacket) {
