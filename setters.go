@@ -42,7 +42,7 @@ func (f *FlexClient) SliceTune(sliceIdx string, freq float64) CmdResult {
 }
 
 func (f *FlexClient) TransmitSet(values Object) CmdResult {
-	return f.setAndUpdateObj("transmit", "transmit", values)
+	return f.setAndUpdateObj("transmit set", "transmit", values)
 }
 
 func (f *FlexClient) TransmitTune(val string) CmdResult {
