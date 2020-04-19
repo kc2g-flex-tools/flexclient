@@ -1,6 +1,9 @@
 package flexclient
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 func (f *FlexClient) sendAndUpdateObj(cmd, object string, changes Object) CmdResult {
 	// TODO: do a dance with "locking" updateState somehow so that we can get the
@@ -38,6 +41,16 @@ func (f *FlexClient) SliceTune(sliceIdx string, freq float64) CmdResult {
 		"slice t "+sliceIdx+" "+freqStr,
 		"slice "+sliceIdx,
 		Object{"RF_frequency": freqStr},
+	)
+}
+
+func (f *FlexClient) SliceSetFilter(sliceIdx string, filterLo, filterHi int) CmdResult {
+	lo := strconv.Itoa(filterLo)
+	hi := strconv.Itoa(filterHi)
+	return f.sendAndUpdateObj(
+		"filt "+sliceIdx+" "+lo+" "+hi,
+		"slice "+sliceIdx,
+		Object{"filter_lo": lo, "filter_hi": hi},
 	)
 }
 
