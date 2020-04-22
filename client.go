@@ -184,8 +184,8 @@ func (f *FlexClient) runTCP() {
 }
 
 func (f *FlexClient) runUDP() {
+	var pkt [64000]byte
 	for {
-		var pkt [64000]byte
 		n, err := f.udpConn.Read(pkt[:])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "udp: %s\n", err.Error())
@@ -217,8 +217,11 @@ func (f *FlexClient) parseUDP(pkt []byte) {
 		return
 	}
 
-	err, preamble, payload := vita.ParseVitaPreamble(pkt)
+	err, preamble, payloadTmp := vita.ParseVitaPreamble(pkt)
 	if err == nil {
+		payload := make([]byte, len(payloadTmp))
+		copy(payload, payloadTmp)
+
 		select {
 		case dchan <- VitaPacket{preamble, payload}:
 		default:
