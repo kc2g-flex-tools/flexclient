@@ -184,8 +184,8 @@ func (f *FlexClient) runTCP() {
 }
 
 func (f *FlexClient) runUDP() {
-	var pkt [64000]byte
 	for {
+		var pkt [64000]byte
 		n, err := f.udpConn.Read(pkt[:])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "udp: %s\n", err.Error())
