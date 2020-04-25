@@ -75,12 +75,32 @@ func (o Object) Copy() Object {
 }
 
 func NewFlexClient(dst string) (*FlexClient, error) {
-	tcpConn, err := net.Dial("tcp", dst+":4992")
+	var ip, tcpPort string
+
+	if strings.HasPrefix(dst, ":discover:") {
+		radio, err := Discover(strings.TrimPrefix(dst, ":discover:"))
+		if err != nil {
+			return nil, fmt.Errorf("discovery: %w", err)
+		}
+		ip = radio["ip"]
+		tcpPort = radio["port"]
+	} else {
+		idx := strings.IndexByte(dst, ':')
+		if idx == -1 {
+			ip = dst
+			tcpPort = "4992"
+		} else {
+			ip = dst[0:idx]
+			tcpPort = dst[idx+1:]
+		}
+	}
+
+	tcpConn, err := net.Dial("tcp", ip+":"+tcpPort)
 	if err != nil {
 		return nil, fmt.Errorf("%w connecting to %s", err, dst)
 	}
 
-	udpDest, err := net.ResolveUDPAddr("udp", dst+":4991")
+	udpDest, err := net.ResolveUDPAddr("udp", ip+":4991")
 	if err != nil {
 		return nil, fmt.Errorf("%w resolving UDP destination", err)
 	}
