@@ -11,7 +11,11 @@ import (
 )
 
 func main() {
-	fc, err := flexclient.NewFlexClient(os.Args[1])
+	dst := ":discover:"
+	if len(os.Args) > 1 {
+		dst = os.Args[1]
+	}
+	fc, err := flexclient.NewFlexClient(dst)
 	if err != nil {
 		panic(err)
 	}
