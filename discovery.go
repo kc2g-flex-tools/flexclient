@@ -1,9 +1,13 @@
 package flexclient
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
+	"syscall"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/krippendorf/flexlib-go/vita"
 )
@@ -18,6 +22,8 @@ func Discover(specString string) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listen for discovery packets: %w", err)
 	}
+
+	defer sock.Close()
 
 	for {
 		pkt := discoveryRecv(sock)
@@ -48,11 +54,24 @@ func parseKv(in string) (map[string]string, error) {
 }
 
 func discoveryListen() (*net.UDPConn, error) {
-	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: nil, Port: 4992})
+	lc := net.ListenConfig{
+		Control: func(_, _ string, c syscall.RawConn) error {
+			var opErr error
+			err := c.Control(func(fd uintptr) {
+				opErr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
+			})
+			if err != nil {
+				return err
+			}
+			return opErr
+		},
+	}
+
+	conn, err := lc.ListenPacket(context.Background(), "udp", ":4992")
 	if err != nil {
 		return nil, fmt.Errorf("discoveryListen: %w", err)
 	}
-	return conn, nil
+	return conn.(*net.UDPConn), nil
 }
 
 func discoveryRecv(conn *net.UDPConn) map[string]string {
