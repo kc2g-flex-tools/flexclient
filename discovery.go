@@ -72,7 +72,6 @@ func discoveryRecv(conn *net.UDPConn) map[string]string {
 }
 
 func discoveryMatch(pkt, spec map[string]string) bool {
-	fmt.Printf("discoveryMatch: %v %v\n", pkt, spec)
 	for key, val := range spec {
 		if pkt[key] != val {
 			return false
