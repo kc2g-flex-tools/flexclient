@@ -1,4 +1,4 @@
-module github.com/arodland/flexclient
+module github.com/kc2g-flex-tools/flexclient
 
 go 1.13
 
