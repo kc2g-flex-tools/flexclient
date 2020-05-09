@@ -162,7 +162,9 @@ func (f *FlexClient) udpPort() int {
 	return f.udpConn.LocalAddr().(*net.UDPAddr).Port
 }
 
-func (f *FlexClient) StartUDP() error {
+// Makes a UDP listen socket and asks the radio to deliver VITA-49 packets
+// to it. Must be done before calling RunUDP.
+func (f *FlexClient) InitUDP() error {
 	udpConn, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		return fmt.Errorf("%w binding to UDP port", err)
@@ -174,7 +176,18 @@ func (f *FlexClient) StartUDP() error {
 		return fmt.Errorf("%08x setting client udpport (%s)", res.Error, res.Message)
 	}
 
-	go f.runUDP()
+	return nil
+}
+
+// Calls InitUDP(), returning error if any, then calls RunUDP() in a goroutine.
+// Provided for interface compatibility with existing clients, and for simplicity for
+// those that don't care about RT scheduling.
+func (f *FlexClient) StartUDP() error {
+	err := f.InitUDP()
+	if err != nil {
+		return err
+	}
+	go f.RunUDP()
 	return nil
 }
 
@@ -203,7 +216,10 @@ func (f *FlexClient) runTCP() {
 	}
 }
 
-func (f *FlexClient) runUDP() {
+// Requires InitUDP() to have been called.
+// This should be run inside a goroutine, but doesn't create one on its own, so that
+// the caller may create their own and acquire realtime priority for it if they wish.
+func (f *FlexClient) RunUDP() {
 	var pkt [64000]byte
 	for {
 		n, err := f.udpConn.Read(pkt[:])
