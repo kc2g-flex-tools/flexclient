@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/krippendorf/flexlib-go/vita"
+	"github.com/hb9fxq/flexlib-go/vita"
 )
 
 type FlexClient struct {

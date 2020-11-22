@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/krippendorf/flexlib-go/vita"
+	"github.com/hb9fxq/flexlib-go/vita"
 )
 
 func Discover(specString string) (map[string]string, error) {
