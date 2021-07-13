@@ -462,7 +462,7 @@ func (f *FlexClient) FindObjects(pfx string) State {
 	defer f.RUnlock()
 	ret := State{}
 
-	for key, _ := range f.state {
+	for key := range f.state {
 		if strings.HasPrefix(key, pfx) {
 			obj, ok := f.getObject(key)
 			if ok {

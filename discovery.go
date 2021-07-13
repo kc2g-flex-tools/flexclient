@@ -43,7 +43,7 @@ func parseKv(in string) (map[string]string, error) {
 		}
 		eqIdx := strings.IndexByte(part, '=')
 		if eqIdx == -1 {
-			return nil, fmt.Errorf("Couldn't parse key/value pair %s", part)
+			return nil, fmt.Errorf("couldn't parse key/value pair %s", part)
 		}
 		key := part[0:eqIdx]
 		val := part[eqIdx+1:]
