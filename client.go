@@ -20,6 +20,7 @@ type FlexClient struct {
 	lines         *bufio.Scanner
 	radioIP       string
 	udpDest       net.Addr
+	udpListenPort int
 	state         State
 	version       string
 	handle        string
@@ -108,6 +109,7 @@ func NewFlexClient(dst string) (*FlexClient, error) {
 	return &FlexClient{
 		radioIP:       dst,
 		udpDest:       udpDest,
+		udpListenPort: 0,
 		tcpConn:       tcpConn,
 		lines:         bufio.NewScanner(tcpConn),
 		state:         State{},
@@ -162,10 +164,19 @@ func (f *FlexClient) udpPort() int {
 	return f.udpConn.LocalAddr().(*net.UDPAddr).Port
 }
 
+func (f *FlexClient) SetUDPPort(port int) {
+	f.udpListenPort = port
+}
+
 // Makes a UDP listen socket and asks the radio to deliver VITA-49 packets
 // to it. Must be done before calling RunUDP.
 func (f *FlexClient) InitUDP() error {
-	udpConn, err := net.ListenUDP("udp", nil)
+	udpConn, err := net.ListenUDP(
+		"udp",
+		&net.UDPAddr{
+			Port: f.udpListenPort,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("%w binding to UDP port", err)
 	}
