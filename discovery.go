@@ -36,6 +36,7 @@ func Discover(specString string) (map[string]string, error) {
 func parseKv(in string) (map[string]string, error) {
 	out := map[string]string{}
 
+	in = strings.Trim(in, " \x00")
 	parts := strings.Split(in, " ")
 	for _, part := range parts {
 		if part == "" {
