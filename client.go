@@ -40,11 +40,16 @@ type CmdResult struct {
 	Serial  uint32
 	Error   uint32
 	Message string
-	fc      *FlexClient
 }
 
 func (c CmdResult) String() string {
 	return fmt.Sprintf("[%d]%08x %s", c.Serial, c.Error, c.Message)
+}
+
+type ResultHandle struct {
+	Serial uint32
+	C      chan CmdResult
+	fc     *FlexClient
 }
 
 type StateUpdate struct {
@@ -139,25 +144,31 @@ func (f *FlexClient) SendCmd(cmd string) uint32 {
 	return f.sendCmd(cmd)
 }
 
-func (f *FlexClient) SendNotify(cmd string) chan CmdResult {
+func (f *FlexClient) SendNotify(cmd string) ResultHandle {
 	f.Lock()
 	defer f.Unlock()
 	idx := f.sendCmd(cmd)
 	f.cmdResults[idx] = make(chan CmdResult)
-	return f.cmdResults[idx]
+	return ResultHandle{
+		fc:     f,
+		Serial: idx,
+		C:      f.cmdResults[idx],
+	}
 }
 
 func (f *FlexClient) SendAndWait(cmd string) CmdResult {
-	resultChan := f.SendNotify(cmd)
-	result := <-resultChan
-	result.Close()
+	h := f.SendNotify(cmd)
+	result := <-h.C
+	h.Close()
 	return result
 }
 
-func (r *CmdResult) Close() {
-	r.fc.Lock()
-	defer r.fc.Unlock()
-	delete(r.fc.cmdResults, r.Serial)
+func (h *ResultHandle) Close() {
+	h.fc.Lock()
+	defer h.fc.Unlock()
+	if h.fc.cmdResults != nil {
+		delete(h.fc.cmdResults, h.Serial)
+	}
 }
 
 func (f *FlexClient) udpPort() int {
@@ -204,15 +215,19 @@ func (f *FlexClient) StartUDP() error {
 
 func (f *FlexClient) Run() {
 	defer func() {
+		f.Lock()
+		defer f.Unlock()
 		if f.messages != nil {
 			close(f.messages)
 		}
 		for _, s := range f.subscriptions {
 			close(s.Updates)
 		}
+		f.subscriptions = nil
 		for _, c := range f.cmdResults {
 			close(c)
 		}
+		f.cmdResults = nil
 		if f.udpConn != nil {
 			f.udpConn.Close()
 		}
@@ -399,7 +414,6 @@ func (f *FlexClient) parseCmdResult(line string) {
 	err, _ := strconv.ParseUint(parts[1], 16, 32)
 
 	res := CmdResult{
-		fc:      f,
 		Serial:  uint32(ser),
 		Error:   uint32(err),
 		Message: parts[2],
