@@ -350,14 +350,23 @@ func (f *FlexClient) parseState(line string) {
 	f.Lock()
 	defer f.Unlock()
 
-	pipeIdx := strings.IndexByte(line, '|')
-	handle := line[:pipeIdx]
-	status := line[pipeIdx+1:]
+	handle, status, _ := strings.Cut(line, "|")
+	firstWord, remainder, _ := strings.Cut(status, " ")
 
+	switch firstWord {
+	case "meter":
+		f.parseMeterState(handle, remainder)
+	default:
+		f.parseGenericState(handle, status)
+	}
+}
+
+func (f *FlexClient) parseGenericState(handle, status string) {
 	object := ""
 	set := Object{}
 
 	parts := strings.Split(status, " ")
+
 	for i, part := range parts {
 		if part == "" {
 			continue
@@ -384,6 +393,35 @@ func (f *FlexClient) parseState(line string) {
 	}
 
 	f.updateState(handle, object, set)
+}
+
+func (f *FlexClient) parseMeterState(handle, meterState string) {
+	if strings.Contains(meterState, "removed") {
+		meterId, _, _ := strings.Cut(meterState, " ")
+		objName := "meter " + meterId
+		f.state[objName] = nil
+		f.updateState(handle, objName, Object{})
+	} else {
+		props := strings.Split(meterState, "#")
+		meters := map[string]Object{}
+		for _, prop := range props {
+			key, val, ok := strings.Cut(prop, "=")
+			if !ok {
+				continue
+			}
+			meterId, key, _ := strings.Cut(key, ".")
+			if _, ok := meters[meterId]; !ok {
+				meters[meterId] = Object{}
+			}
+			meters[meterId][key] = val
+		}
+
+		for meterId, obj := range meters {
+			objName := "meter " + meterId
+			f.state[objName] = obj
+			f.updateState(handle, objName, obj)
+		}
+	}
 }
 
 // Assumes locked
@@ -482,9 +520,7 @@ func (f *FlexClient) GetObject(key string) (Object, bool) {
 	return f.getObject(key)
 }
 
-func (f *FlexClient) FindObjects(pfx string) State {
-	f.RLock()
-	defer f.RUnlock()
+func (f *FlexClient) findObjects(pfx string) State {
 	ret := State{}
 
 	for key := range f.state {
@@ -496,6 +532,12 @@ func (f *FlexClient) FindObjects(pfx string) State {
 		}
 	}
 	return ret
+}
+
+func (f *FlexClient) FindObjects(pfx string) State {
+	f.RLock()
+	defer f.RUnlock()
+	return f.findObjects(pfx)
 }
 
 func (f *FlexClient) ClientID() string {
