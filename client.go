@@ -361,6 +361,17 @@ func (f *FlexClient) parseState(line string) {
 	}
 }
 
+// For the given object/key pairs, the value should have
+// the character 0x7f replaced with 0x20 (space).
+var replace7f = map[[2]string]bool{
+	{"client", "station"}: true,
+	{"memory", "owner"}:   true,
+	{"memory", "group"}:   true,
+	{"memory", "name"}:    true,
+	{"spot", "callsign"}:  true,
+	{"spot", "comment"}:   true,
+}
+
 func (f *FlexClient) parseGenericState(handle, status string) {
 	object := ""
 	set := Object{}
@@ -388,6 +399,9 @@ func (f *FlexClient) parseGenericState(handle, status string) {
 		} else {
 			key := part[0:eqIdx]
 			val := part[eqIdx+1:]
+			if replace7f[[2]string{parts[0], key}] {
+				val = strings.ReplaceAll(val, "\x7f", " ")
+			}
 			set[key] = val
 		}
 	}
