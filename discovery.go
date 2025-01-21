@@ -1,9 +1,15 @@
 package flexclient
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
+	"os"
+	"reflect"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/hb9fxq/flexlib-go/vita"
 )
@@ -63,6 +69,9 @@ func discoveryRecv(conn *net.UDPConn) map[string]string {
 				}
 			}
 		}
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			return nil
+		}
 	}
 }
 
@@ -73,4 +82,58 @@ func discoveryMatch(pkt, spec map[string]string) bool {
 		}
 	}
 	return true
+}
+
+func DiscoverAll(ctx context.Context, timeout time.Duration, results chan []map[string]string) error {
+	sock, err := discoveryListen()
+	if err != nil {
+		return fmt.Errorf("listen for discovery packets: %w", err)
+	}
+	defer sock.Close()
+	defer func() { close(results) }()
+
+	type record struct {
+		lastSeen time.Time
+		desc     map[string]string
+	}
+	known := map[string]record{}
+	changed := true
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		sock.SetDeadline(time.Now().Add(time.Second))
+		pkt := discoveryRecv(sock)
+		now := time.Now()
+		if pkt != nil {
+			serial, ok := pkt["serial"]
+			if ok {
+				if known[serial].desc == nil || !reflect.DeepEqual(pkt, known[serial].desc) {
+					changed = true
+				}
+				known[serial] = record{
+					lastSeen: now,
+					desc:     pkt,
+				}
+			}
+		}
+		publish := make([]map[string]string, 0, len(known))
+		for serial, entry := range known {
+			if timeout != 0 && entry.lastSeen.Before(now.Add(-timeout)) {
+				delete(known, serial)
+				changed = true
+			} else {
+				publish = append(publish, entry.desc)
+			}
+		}
+		if changed {
+			sort.Slice(publish, func(i, j int) bool {
+				return publish[i]["serial"] < publish[j]["serial"]
+			})
+			results <- publish
+			changed = false
+		}
+	}
 }
