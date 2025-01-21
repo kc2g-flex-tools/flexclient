@@ -29,6 +29,7 @@ type FlexClient struct {
 	subscriptions []Subscription
 	cmdResults    map[uint32]chan CmdResult
 	vitaPackets   chan VitaPacket
+	stateNotify   chan struct{}
 }
 
 type Message struct {
@@ -458,6 +459,18 @@ func (f *FlexClient) updateState(updatedBy string, object string, changes Object
 			}
 		}
 	}
+	if f.stateNotify != nil {
+		select {
+		case f.stateNotify <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (f *FlexClient) SetStateNotify(ch chan struct{}) {
+	f.Lock()
+	defer f.Unlock()
+	f.stateNotify = ch
 }
 
 func (f *FlexClient) parseCmdResult(line string) {
