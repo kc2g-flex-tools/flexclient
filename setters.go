@@ -69,3 +69,38 @@ func (f *FlexClient) TransmitTune(val string) CmdResult {
 func (f *FlexClient) RadioSet(values Object) CmdResult {
 	return f.setAndUpdateObj("radio set", "radio", values)
 }
+
+func (f *FlexClient) PanSet(id string, values Object) CmdResult {
+	result := f.setAndUpdateObj("display pan set "+id, "display pan "+id, values)
+	if result.Error != 0 {
+		return result
+	}
+
+	// Funny API quirk: updating a panadapter also updates an associated waterfall
+	// but you won't get a notification about it. Synthesize a state update on the
+	// waterfall, for any keys that also exist there.
+	f.Lock()
+	defer f.Unlock()
+	pan, ok := f.getObject("display pan " + id)
+	if !ok {
+		return result
+	}
+	childWaterfallId, ok := pan["waterfall"]
+	if !ok {
+		return result
+	}
+	wf, ok := f.getObject("display waterfall " + childWaterfallId)
+	if !ok {
+		return result
+	}
+	var setWf = values.Copy()
+	for key := range values {
+		if _, exists := wf[key]; !exists {
+			delete(setWf, key)
+		}
+	}
+	if len(setWf) > 0 {
+		f.updateState("", "display waterfall "+childWaterfallId, setWf)
+	}
+	return result
+}
