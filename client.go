@@ -2,6 +2,7 @@ package flexclient
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -155,6 +156,20 @@ func (f *FlexClient) SendAndWait(cmd string) CmdResult {
 	result := <-h.C
 	h.Close()
 	return result
+}
+
+// SendAndWaitContext sends a command and waits for the result, or returns an error if the
+// context is canceled before the result is received.
+func (f *FlexClient) SendAndWaitContext(ctx context.Context, cmd string) (CmdResult, error) {
+	h := f.SendNotify(cmd)
+	select {
+	case result := <-h.C:
+		h.Close()
+		return result, nil
+	case <-ctx.Done():
+		h.Close()
+		return CmdResult{}, ctx.Err()
+	}
 }
 
 func (h *ResultHandle) Close() {
