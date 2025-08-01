@@ -228,6 +228,7 @@ func (f *FlexClient) Run() {
 		defer f.Unlock()
 		if f.messages != nil {
 			close(f.messages)
+			f.messages = nil
 		}
 		for _, s := range f.subscriptions {
 			close(s.Updates)
@@ -239,6 +240,7 @@ func (f *FlexClient) Run() {
 		f.cmdResults = nil
 		if f.udpConn != nil {
 			f.udpConn.Close()
+			f.udpConn = nil
 		}
 	}()
 
@@ -501,6 +503,7 @@ func (f *FlexClient) Unsubscribe(sub Subscription) {
 	}
 	if sub.Updates != nil {
 		close(sub.Updates)
+		sub.Updates = nil
 	}
 }
 
