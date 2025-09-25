@@ -14,21 +14,23 @@ import (
 type FlexClient struct {
 	sync.RWMutex
 
-	tcpConn       net.Conn
-	udpConn       *net.UDPConn
-	lines         *bufio.Scanner
-	radioIP       string
-	udpDest       net.Addr
-	udpListenPort int
-	state         State
-	version       string
-	handle        string
-	cmdIndex      uint32
-	messages      chan Message
-	subscriptions []Subscription
-	cmdResults    map[uint32]chan CmdResult
-	vitaPackets   chan VitaPacket
-	stateNotify   chan struct{}
+	tcpConn        net.Conn
+	udpConn        *net.UDPConn
+	lines          *bufio.Scanner
+	radioIP        string
+	udpDest        net.Addr
+	udpListenPort  int
+	state          State
+	version        string
+	handle         string
+	cmdIndex       uint32
+	messages       chan Message
+	subscriptions  []Subscription
+	cmdResults     map[uint32]chan CmdResult
+	vitaPackets    chan VitaPacket
+	meterChan      chan MeterReport
+	meterTemplates map[string]MeterReport
+	stateNotify    chan struct{}
 }
 
 type Message struct {
@@ -107,14 +109,15 @@ func NewFlexClient(dst string) (*FlexClient, error) {
 	}
 
 	return &FlexClient{
-		radioIP:       dst,
-		udpDest:       udpDest,
-		udpListenPort: 0,
-		tcpConn:       tcpConn,
-		lines:         bufio.NewScanner(tcpConn),
-		state:         State{},
-		cmdResults:    map[uint32]chan CmdResult{},
-		subscriptions: []Subscription{},
+		radioIP:        dst,
+		udpDest:        udpDest,
+		udpListenPort:  0,
+		tcpConn:        tcpConn,
+		lines:          bufio.NewScanner(tcpConn),
+		state:          State{},
+		cmdResults:     map[uint32]chan CmdResult{},
+		subscriptions:  []Subscription{},
+		meterTemplates: map[string]MeterReport{},
 	}, nil
 }
 
@@ -391,35 +394,6 @@ func (f *FlexClient) parseGenericState(handle, status string) {
 	}
 
 	f.updateState(handle, object, set)
-}
-
-func (f *FlexClient) parseMeterState(handle, meterState string) {
-	if strings.Contains(meterState, "removed") {
-		meterId, _, _ := strings.Cut(meterState, " ")
-		objName := "meter " + meterId
-		f.state[objName] = nil
-		f.updateState(handle, objName, Object{})
-	} else {
-		props := strings.Split(meterState, "#")
-		meters := map[string]Object{}
-		for _, prop := range props {
-			key, val, ok := strings.Cut(prop, "=")
-			if !ok {
-				continue
-			}
-			meterId, key, _ := strings.Cut(key, ".")
-			if _, ok := meters[meterId]; !ok {
-				meters[meterId] = Object{}
-			}
-			meters[meterId][key] = val
-		}
-
-		for meterId, obj := range meters {
-			objName := "meter " + meterId
-			f.state[objName] = obj
-			f.updateState(handle, objName, obj)
-		}
-	}
 }
 
 // Assumes locked
