@@ -3,6 +3,7 @@ package flexclient
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -265,16 +266,14 @@ func (f *FlexClient) RunUDP() {
 		n, err := f.udpConn.Read(pkt[:])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "udp: %s\n", err.Error())
-			switch e := err.(type) {
-			case net.Error:
-				if e.Temporary() {
+			var netErr net.Error
+			if errors.As(err, &netErr) {
+				// For network errors, only exit on timeout/deadline
+				if !errors.Is(err, os.ErrDeadlineExceeded) {
 					continue
-				} else {
-					goto out
 				}
-			default:
-				goto out
 			}
+			goto out
 		} else {
 			f.parseUDP(pkt[:n])
 		}
