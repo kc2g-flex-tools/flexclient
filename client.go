@@ -407,6 +407,11 @@ func (f *FlexClient) updateState(updatedBy string, object string, changes Object
 	}
 
 	for k, v := range changes {
+		if strings.HasPrefix(object, "usb_cable ") && strings.HasPrefix(k, "data:") {
+			// Special case:  data received from USB cables is passed to any subscriptions
+			// but not persisted in state.
+			continue
+		}
 		f.state[object][k] = v
 	}
 

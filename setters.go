@@ -115,3 +115,11 @@ func (f *FlexClient) PanSet(ctx context.Context, id string, values Object) (CmdR
 	}
 	return result, nil
 }
+
+func (f *FlexClient) UsbCableSet(ctx context.Context, id string, values Object) (CmdResult, error) {
+	return f.setAndUpdateObj(ctx,
+		"usb_cable set "+id,
+		"usb_cable "+id,
+		values,
+	)
+}
