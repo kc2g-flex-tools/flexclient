@@ -325,6 +325,10 @@ func (f *FlexClient) parseMessage(line string) {
 
 	if dchan != nil {
 		pipeIdx := strings.IndexByte(line, '|')
+		if pipeIdx == -1 {
+			log.Printf("flexclient: malformed message line: %s", line)
+			return
+		}
 		msg := Message{
 			SenderHandle: line[:pipeIdx],
 			Message:      line[pipeIdx+1:],
