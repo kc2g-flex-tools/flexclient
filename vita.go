@@ -1,8 +1,7 @@
 package flexclient
 
 import (
-	"fmt"
-	"os"
+	"log"
 
 	"github.com/hb9fxq/flexlib-go/vita"
 )
@@ -36,7 +35,7 @@ func (f *FlexClient) parseUDP(pkt []byte) {
 			}
 		}
 	} else {
-		fmt.Fprintf(os.Stderr, "vita parse err %s\n", err.Error())
+		log.Printf("flexclient: VITA parse error: %v", err)
 	}
 }
 

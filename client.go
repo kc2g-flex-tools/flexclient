@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strconv"
@@ -265,7 +266,7 @@ func (f *FlexClient) RunUDP() {
 	for {
 		n, err := f.udpConn.Read(pkt[:])
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "udp: %s\n", err.Error())
+			log.Printf("flexclient: UDP read error: %v", err)
 			var netErr net.Error
 			if errors.As(err, &netErr) {
 				// For network errors, only exit on timeout/deadline
@@ -301,7 +302,7 @@ func (f *FlexClient) parseLine(line string) {
 	case 'R':
 		f.parseCmdResult(line[1:])
 	default:
-		fmt.Fprintln(os.Stderr, "Unknown line:", line)
+		log.Printf("flexclient: unknown protocol line: %s", line)
 	}
 }
 
