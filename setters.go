@@ -64,6 +64,10 @@ func (f *FlexClient) TransmitSet(ctx context.Context, values Object) (CmdResult,
 	return f.setAndUpdateObj(ctx, "transmit set", "transmit", values)
 }
 
+func (f *FlexClient) TransmitAMCarrierSet(ctx context.Context, val string) (CmdResult, error) {
+	return f.sendAndUpdateObj(ctx, "transmit set am_carrier="+val, "transmit", Object{"am_carrier_level": val})
+}
+
 func (f *FlexClient) TransmitTune(ctx context.Context, val string) (CmdResult, error) {
 	return f.sendAndUpdateObj(
 		ctx,
