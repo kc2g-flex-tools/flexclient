@@ -40,10 +40,18 @@ func (f *FlexClient) SliceSet(ctx context.Context, sliceIdx string, values Objec
 }
 
 func (f *FlexClient) SliceTune(ctx context.Context, sliceIdx string, freq float64) (CmdResult, error) {
+	return f.SliceTuneOpts(ctx, sliceIdx, freq, Object{})
+}
+
+func (f *FlexClient) SliceTuneOpts(ctx context.Context, sliceIdx string, freq float64, opts Object) (CmdResult, error) {
 	freqStr := fmt.Sprintf("%.6f", freq)
+	cmd := "slice t " + sliceIdx + " " + freqStr
+	for k, v := range opts {
+		cmd += " " + k + "=" + v
+	}
 	return f.sendAndUpdateObj(
 		ctx,
-		"slice t "+sliceIdx+" "+freqStr,
+		cmd,
 		"slice "+sliceIdx,
 		Object{"RF_frequency": freqStr},
 	)
