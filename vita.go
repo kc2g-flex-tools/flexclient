@@ -44,6 +44,9 @@ func (f *FlexClient) SendUdp(pkt []byte) error {
 	return err
 }
 
+// SetVitaChan sets the channel for receiving raw VITA-49 packets.
+// This must be called before InitUDP/StartUDP. The channel will be closed when RunUDP() exits.
+// The caller creates the channel but must not close it.
 func (f *FlexClient) SetVitaChan(ch chan VitaPacket) {
 	f.Lock()
 	defer f.Unlock()
