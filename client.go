@@ -3,6 +3,7 @@ package flexclient
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log"
@@ -68,8 +69,10 @@ type Subscription struct {
 	Updates chan StateUpdate
 }
 
-type Object map[string]string
-type State map[string]Object
+type (
+	Object map[string]string
+	State  map[string]Object
+)
 
 func (o Object) Copy() Object {
 	ret := Object{}
@@ -79,7 +82,36 @@ func (o Object) Copy() Object {
 	return ret
 }
 
+// FlexClientOption is a functional option for configuring a FlexClient.
+type FlexClientOption func(*flexClientConfig)
+
+type flexClientConfig struct {
+	useTLS    bool
+	tlsConfig *tls.Config
+}
+
+// WithTLS enables TLS for the TCP connection to the radio.
+// If tlsConfig is nil, a default TLS configuration will be used.
+// This is required for FlexRadio SmartLink connections.
+func WithTLS(tlsConfig *tls.Config) FlexClientOption {
+	return func(c *flexClientConfig) {
+		c.useTLS = true
+		c.tlsConfig = tlsConfig
+	}
+}
+
 func NewFlexClient(dst string) (*FlexClient, error) {
+	return NewFlexClientWithOptions(dst)
+}
+
+func NewFlexClientWithOptions(dst string, opts ...FlexClientOption) (*FlexClient, error) {
+	config := &flexClientConfig{
+		useTLS:    false,
+		tlsConfig: nil,
+	}
+	for _, opt := range opts {
+		opt(config)
+	}
 	var ip, tcpPort string
 
 	if strings.HasPrefix(dst, ":discover:") {
@@ -100,7 +132,18 @@ func NewFlexClient(dst string) (*FlexClient, error) {
 		}
 	}
 
-	tcpConn, err := net.Dial("tcp", ip+":"+tcpPort)
+	var tcpConn net.Conn
+	var err error
+
+	if config.useTLS {
+		tlsConf := config.tlsConfig
+		if tlsConf == nil {
+			tlsConf = &tls.Config{}
+		}
+		tcpConn, err = tls.Dial("tcp", ip+":"+tcpPort, tlsConf)
+	} else {
+		tcpConn, err = net.Dial("tcp", ip+":"+tcpPort)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%w connecting to %s", err, dst)
 	}
@@ -212,6 +255,21 @@ func (f *FlexClient) InitUDP() error {
 		return fmt.Errorf("%08x setting client udpport (%s)", res.Error, res.Message)
 	}
 
+	return nil
+}
+
+func (f *FlexClient) InitWANUDP(dst string) error {
+	udpAddr, err := net.ResolveUDPAddr("udp", dst)
+	if err != nil {
+		return fmt.Errorf("%w resolving UDP address", err)
+	}
+	udpConn, err := net.DialUDP("udp", nil, udpAddr)
+	if err != nil {
+		return fmt.Errorf("%w dialing UDP address", err)
+	}
+	f.udpConn = udpConn
+	f.udpDest = nil // Mark as pre-connected socket for SendUdp
+	fmt.Fprintf(f.udpConn, "client udp_register handle=0x%s\n", f.ClientID())
 	return nil
 }
 

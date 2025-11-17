@@ -40,6 +40,14 @@ func (f *FlexClient) parseUDP(pkt []byte) {
 }
 
 func (f *FlexClient) SendUdp(pkt []byte) error {
+	// If udpDest is nil, this is a pre-connected socket (from InitWanUDP)
+	// and we must use Write() instead of WriteTo()
+	if f.udpDest == nil {
+		_, err := f.udpConn.Write(pkt)
+		return err
+	}
+	// Otherwise, this is an unconnected socket (from InitUDP)
+	// and we use WriteTo() with the destination
 	_, err := f.udpConn.WriteTo(pkt, f.udpDest)
 	return err
 }
