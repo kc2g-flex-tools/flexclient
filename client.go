@@ -36,6 +36,17 @@ type FlexClient struct {
 	stateNotify    chan struct{}
 }
 
+// GetMeterMetadata returns a copy of all meter templates (metadata) with read locking.
+func (f *FlexClient) GetMeterMetadata() map[string]MeterReport {
+	f.RLock()
+	defer f.RUnlock()
+	ret := map[string]MeterReport{}
+	for k, v := range f.meterTemplates {
+		ret[k] = v
+	}
+	return ret
+}
+
 type Message struct {
 	SenderHandle string
 	Message      string
