@@ -76,7 +76,7 @@ func (f *FlexClient) parseMeterState(handle, meterState string) {
 				}
 			}
 			if obj["hi"] != "" {
-				if v, err := strconv.ParseFloat(obj["high"], 64); err == nil {
+				if v, err := strconv.ParseFloat(obj["hi"], 64); err == nil {
 					highVal = v
 				}
 			}
