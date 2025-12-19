@@ -22,6 +22,10 @@ type MeterReport struct {
 	Num int
 	// Unit is the unit of measurement (e.g., "dBm", "Volts", "degF")
 	Unit string
+	// Low is the minimum of the valid range
+	Low float64
+	// High is the maximum of the valid range
+	High float64
 	// RawValue is the raw value from the radio
 	RawValue int16
 	// Value is the translated value based on the unit
@@ -64,11 +68,26 @@ func (f *FlexClient) parseMeterState(handle, meterState string) {
 				}
 			}
 
+			lowVal := 0.0
+			highVal := 0.0
+			if obj["low"] != "" {
+				if v, err := strconv.ParseFloat(obj["low"], 64); err == nil {
+					lowVal = v
+				}
+			}
+			if obj["high"] != "" {
+				if v, err := strconv.ParseFloat(obj["high"], 64); err == nil {
+					highVal = v
+				}
+			}
+
 			f.meterTemplates[objName] = MeterReport{
 				Source: obj["src"],
 				Name:   obj["nam"],
 				Num:    numInt,
 				Unit:   obj["unit"],
+				Low:    lowVal,
+				High:   highVal,
 			}
 		}
 	}
