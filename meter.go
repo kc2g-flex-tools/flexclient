@@ -14,6 +14,8 @@ import (
 // MeterReport represents a meter reading. It combines data from
 // a UDP meter packet with metadata from a meter subscription.
 type MeterReport struct {
+	// ID is the numeric meter identifier from the VITA-49 packet.
+	ID uint16
 	// Source is the source of the meter (e.g. "TX-", "RAD", or "SLC")
 	Source string
 	// Name is the name of the meter
@@ -150,6 +152,7 @@ func (f *FlexClient) processMeterPacket(payload []byte) {
 
 		if exists {
 			report := meterTemplate
+			report.ID = id
 			report.RawValue = rawVal
 			report.Value = translateMeterValue(rawVal, report.Unit)
 
