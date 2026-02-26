@@ -25,6 +25,8 @@ func (f *FlexClient) parseUDP(pkt []byte) {
 			switch preamble.Class_id.PacketClassCode {
 			case vita.SL_VITA_METER_CLASS:
 				f.processMeterPacket(payload)
+			case vita.SL_VITA_FFT_CLASS:
+				f.parseFFTPacket(preamble.Stream_id, payload)
 			case vita.SL_VITA_IF_NARROW_CLASS:
 				f.parsePCMPacket(payload)
 			}

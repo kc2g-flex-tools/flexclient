@@ -35,7 +35,10 @@ type FlexClient struct {
 	meterTemplates map[string]MeterReport
 	stateNotify    chan struct{}
 
+	fftChan chan FFTFrame
 	pcmChan chan []float32
+	fftMu   sync.Mutex
+	fftBufs map[uint32]*fftSegBuf
 }
 
 // GetMeterMetadata returns a copy of all meter templates (metadata) with read locking.
