@@ -21,10 +21,13 @@ func (f *FlexClient) parseUDP(pkt []byte) {
 		payload := make([]byte, len(payloadTmp))
 		copy(payload, payloadTmp)
 
-		// Check if this is a meter packet
-		if isMeterPacket(preamble) {
-			// Process meter packet
-			f.processMeterPacket(payload)
+		if preamble.Class_id != nil {
+			switch preamble.Class_id.PacketClassCode {
+			case vita.SL_VITA_METER_CLASS:
+				f.processMeterPacket(payload)
+			case vita.SL_VITA_IF_NARROW_CLASS:
+				f.parsePCMPacket(payload)
+			}
 		}
 
 		// Forward the packet to vitaPackets channel if set
