@@ -139,3 +139,43 @@ func (f *FlexClient) UsbCableSet(ctx context.Context, id string, values Object) 
 		values,
 	)
 }
+
+// PanafallCreate creates a panadapter+waterfall display.
+// Returns a CmdResult whose Message is "0x<panID>" or "0x<panID>,0x<wfID>".
+func (f *FlexClient) PanafallCreate(ctx context.Context, freq float64, xpixels, ypixels int) (CmdResult, error) {
+	return f.SendAndWaitContext(ctx, fmt.Sprintf("display pan c freq=%.6f x=%d y=%d", freq, xpixels, ypixels))
+}
+
+// WaterfallSet sets display panafall properties (auto_black, color_gain, black_level, etc.)
+// id is the waterfall stream ID hex string, e.g. "0x42000001".
+func (f *FlexClient) WaterfallSet(ctx context.Context, id string, values Object) (CmdResult, error) {
+	return f.setAndUpdateObj(ctx, "display panafall s "+id, "display waterfall "+id, values)
+}
+
+// StreamCreate sends "stream create" with the given key=value fields.
+func (f *FlexClient) StreamCreate(ctx context.Context, values Object) (CmdResult, error) {
+	cmd := "stream create"
+	for k, v := range values {
+		cmd += " " + k + "=" + v
+	}
+	return f.SendAndWaitContext(ctx, cmd)
+}
+
+// StreamRemove sends "stream remove <id>". id should include the "0x" prefix.
+func (f *FlexClient) StreamRemove(ctx context.Context, id string) (CmdResult, error) {
+	return f.SendAndWaitContext(ctx, "stream remove "+id)
+}
+
+// SliceCreate sends "slice create" with optional fields (freq, mode, ant, pan).
+func (f *FlexClient) SliceCreate(ctx context.Context, values Object) (CmdResult, error) {
+	cmd := "slice create"
+	for k, v := range values {
+		cmd += " " + k + "=" + v
+	}
+	return f.SendAndWaitContext(ctx, cmd)
+}
+
+// SliceRemove sends "slice remove <idx>".
+func (f *FlexClient) SliceRemove(ctx context.Context, sliceIdx string) (CmdResult, error) {
+	return f.SendAndWaitContext(ctx, "slice r "+sliceIdx)
+}
