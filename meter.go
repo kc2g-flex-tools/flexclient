@@ -96,7 +96,7 @@ func (f *FlexClient) parseMeterState(handle, meterState string) {
 // translateMeterValue converts the raw meter value to a float64 based on the unit
 func translateMeterValue(rawValue int16, unit string) float64 {
 	switch unit {
-	case "dBm", "dBFS", "SWR":
+	case "dBm", "dBFS", "dB", "SWR":
 		return float64(rawValue) / 128
 	case "Volts":
 		return float64(rawValue) / 256
