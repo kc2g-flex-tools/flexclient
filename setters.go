@@ -179,3 +179,29 @@ func (f *FlexClient) SliceCreate(ctx context.Context, values Object) (CmdResult,
 func (f *FlexClient) SliceRemove(ctx context.Context, sliceIdx string) (CmdResult, error) {
 	return f.SendAndWaitContext(ctx, "slice r "+sliceIdx)
 }
+
+// SliceAudioGain sets the audio gain for a slice on a given client handle.
+// gain is in the range 0.0–1.0. clientHandle should be a hex string like "0x12345678".
+// Optimistically updates the slice's audio_level state (0–100 integer).
+func (f *FlexClient) SliceAudioGain(ctx context.Context, clientHandle, sliceIdx string, gain float64) (CmdResult, error) {
+	return f.sendAndUpdateObj(ctx,
+		fmt.Sprintf("audio client %s slice %s gain %.2f", clientHandle, sliceIdx, gain),
+		"slice "+sliceIdx,
+		Object{"audio_level": strconv.Itoa(int(gain*100))},
+	)
+}
+
+// SliceAudioMute sets the mute state for a slice on a given client handle.
+// clientHandle should be a hex string like "0x12345678".
+// Optimistically updates the slice's audio_mute state.
+func (f *FlexClient) SliceAudioMute(ctx context.Context, clientHandle, sliceIdx string, mute bool) (CmdResult, error) {
+	muteStr := "0"
+	if mute {
+		muteStr = "1"
+	}
+	return f.sendAndUpdateObj(ctx,
+		fmt.Sprintf("audio client %s slice %s mute %s", clientHandle, sliceIdx, muteStr),
+		"slice "+sliceIdx,
+		Object{"audio_mute": muteStr},
+	)
+}
