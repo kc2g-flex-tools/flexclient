@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 type FlexClient struct {
@@ -39,6 +41,8 @@ type FlexClient struct {
 	pcmChan chan []float32
 	fftMu   sync.Mutex
 	fftBufs map[uint32]*fftSegBuf
+
+	closing atomic.Bool
 }
 
 // GetMeterMetadata returns a copy of all meter templates (metadata) with read locking.
@@ -318,6 +322,8 @@ func (f *FlexClient) Run() {
 		}
 		f.cmdResults = nil
 		if f.udpConn != nil {
+			f.closing.Store(true)
+			f.udpConn.SetReadDeadline(time.Now()) // unblock RunUDP
 			f.udpConn.Close()
 			f.udpConn = nil
 		}
@@ -340,6 +346,9 @@ func (f *FlexClient) RunUDP() {
 	for {
 		n, err := f.udpConn.Read(pkt[:])
 		if err != nil {
+			if f.closing.Load() {
+				goto out
+			}
 			log.Printf("flexclient: UDP read error: %v", err)
 			var netErr net.Error
 			if errors.As(err, &netErr) {
@@ -534,6 +543,12 @@ func (f *FlexClient) parseCmdResult(line string) {
 }
 
 func (f *FlexClient) Close() error {
+	f.closing.Store(true)
+	f.RLock()
+	if f.udpConn != nil {
+		f.udpConn.SetReadDeadline(time.Now()) // unblock RunUDP
+	}
+	f.RUnlock()
 	return f.tcpConn.Close()
 }
 
