@@ -181,13 +181,14 @@ func (f *FlexClient) SliceRemove(ctx context.Context, sliceIdx string) (CmdResul
 }
 
 // SliceAudioGain sets the audio gain for a slice on a given client handle.
-// gain is in the range 0.0–1.0. clientHandle should be a hex string like "0x12345678".
-// Optimistically updates the slice's audio_level state (0–100 integer).
-func (f *FlexClient) SliceAudioGain(ctx context.Context, clientHandle, sliceIdx string, gain float64) (CmdResult, error) {
+// gain is in the range 0–100. clientHandle should be a hex string like "0x12345678".
+// Optimistically updates the slice's audio_level state.
+func (f *FlexClient) SliceAudioGain(ctx context.Context, clientHandle, sliceIdx string, gain int) (CmdResult, error) {
+	gainStr := strconv.Itoa(gain)
 	return f.sendAndUpdateObj(ctx,
-		fmt.Sprintf("audio client %s slice %s gain %.2f", clientHandle, sliceIdx, gain),
+		fmt.Sprintf("audio client %s slice %s gain %s", clientHandle, sliceIdx, gainStr),
 		"slice "+sliceIdx,
-		Object{"audio_level": strconv.Itoa(int(gain*100))},
+		Object{"audio_level": gainStr},
 	)
 }
 
