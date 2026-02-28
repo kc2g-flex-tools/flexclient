@@ -120,7 +120,7 @@ func (f *FlexClient) PanSet(ctx context.Context, id string, values Object) (CmdR
 	if !ok {
 		return result, fmt.Errorf("waterfall %s not found", childWaterfallId)
 	}
-	var setWf = values.Copy()
+	setWf := values.Copy()
 	for key := range values {
 		if _, exists := wf[key]; !exists {
 			delete(setWf, key)
@@ -204,5 +204,20 @@ func (f *FlexClient) SliceAudioMute(ctx context.Context, clientHandle, sliceIdx 
 		fmt.Sprintf("audio client %s slice %s mute %s", clientHandle, sliceIdx, muteStr),
 		"slice "+sliceIdx,
 		Object{"audio_mute": muteStr},
+	)
+}
+
+// SliceLock locks or unlocks a slice.
+func (f *FlexClient) SliceLock(ctx context.Context, sliceIdx string, lock bool) (CmdResult, error) {
+	lockStr := "0"
+	action := "unlock"
+	if lock {
+		lockStr = "1"
+		action = "lock"
+	}
+	return f.sendAndUpdateObj(ctx,
+		fmt.Sprintf("slice %s %s", action, sliceIdx),
+		"slice "+sliceIdx,
+		Object{"lock": lockStr},
 	)
 }
